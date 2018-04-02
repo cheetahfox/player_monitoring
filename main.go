@@ -5,6 +5,8 @@ import (
 	"os"
 	"net/http"
 	"log"
+	"database/sql"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/PuerkitoBio/goquery"
 )
 
@@ -53,6 +55,23 @@ func FetchPage(url string) ([]string, []string) {
 	return names, jobs
 }
 
+func GetDB(conn string) {
+	/*
+	This functtion is connects to the mysql database to store player names peristently 
+	*/
+	db, err := sql.Open("mysql", conn)
+	if err != nil {
+		panic(err.Error())
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Printf("Database Open\n)")
+}
+
 func main() {
 	names := make([]string,0)
 	jobs  := make([]string,0)
@@ -61,7 +80,12 @@ func main() {
 	if len(os.Args) > 1 {
 		names, jobs = FetchPage(os.Args[1])
 	}
+	fmt.Printf("%d Players seeking\n",len(names))
 	for x := 0; x < len(names); x++{
 		fmt.Printf(" Player: %s, is seeking on %s\n", names[x], jobs[x])
 	}
+	if len(os.Args) > 2 {
+		GetDB(os.Args[2])
+	}
+
 }
