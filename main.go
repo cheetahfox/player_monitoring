@@ -8,9 +8,12 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-func FetchPage() {
-	// Get the Url passed into the program
-	res, err := http.Get(os.Args[1])
+func FetchPage(url string) {
+	/* This funciton is rather specific to the page I am scraping. We take the url 
+	and return a 2d slice with players names and jobs that currently seeking 
+	party. 
+	*/
+	res, err := http.Get(url)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -26,6 +29,7 @@ func FetchPage() {
 	}
 
 	doc.Find("td").Each(func(i int, s *goquery.Selection) {
+		// We skip the first two TD's because they don't contain normal data
 		if i == 1 {
 			return;
 		}
@@ -42,9 +46,8 @@ func FetchPage() {
 }
 
 func main() {
-	// Check that 
+	// Check that we have something in the command line
 	if len(os.Args) > 1 {
-		fmt.Println(os.Args[1])
-		FetchPage()
+		FetchPage(os.Args[1])
 	}
 }
