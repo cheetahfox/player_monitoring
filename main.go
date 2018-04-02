@@ -39,15 +39,14 @@ func FetchPage(url string) ([]string, []string) {
 		if i == 2 {
 			return;
 		}
+		/* This is going to give us two slices where the index matches up each players
+		jobs and names are the same. Since we aren't modifying these in later in the program 
+		I think this is ok...
+		*/
 		if (i-1)%4 == 0 {
-			// x is the index in the data slice
-			x := (i-1)/4
-			fmt.Printf("index is %d, Slice Element is %d, name is ----> %s\n", i, x, s.Text())
 			names = append(names, s.Text())
 		}
 		if (i-2)%4 == 0 {
-			x := (i-2)/4
-			fmt.Printf("index is %d, Slice Element is %d, job is ----> %s\n", i, x, s.Text())
 			jobs = append(jobs, s.Text())
 		}
 		})
@@ -62,9 +61,7 @@ func main() {
 	if len(os.Args) > 1 {
 		names, jobs = FetchPage(os.Args[1])
 	}
-	fmt.Printf("size of names %d\n",len(names))
-	fmt.Printf("size of jobs  %d\n",len(jobs))
-	/*for _, x := range names {
+	for x := 0; x < len(names); x++{
 		fmt.Printf(" Player: %s, is seeking on %s\n", names[x], jobs[x])
-	} */
+	}
 }
