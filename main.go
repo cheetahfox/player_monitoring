@@ -10,7 +10,17 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-func FetchPage(url string) ([]string, []string) {
+// This is the main user data structure
+type Player struct {
+	Name string
+	Jobtxt string
+	mainjob string
+	mainlevel int
+	subjob string
+	sublevel int
+}
+
+func FetchPage(url string) []*Player {
 	/* This funciton is rather specific to the page I am scraping. We take the url 
 	and return two slices with players names and jobs that currently seeking 
 	party. 
@@ -30,8 +40,10 @@ func FetchPage(url string) ([]string, []string) {
 		log.Fatal(err)
 	}
 
+	players := []*Player{}
 	names := make([]string,0)
 	jobs  := make([]string,0)
+
 
 	doc.Find("td").Each(func(i int, s *goquery.Selection) {
 		// We skip the first two TD's because they don't contain normal data
@@ -52,12 +64,23 @@ func FetchPage(url string) ([]string, []string) {
 			jobs = append(jobs, s.Text())
 		}
 		})
-	return names, jobs
+
+	for x := 0; x < len(names); x++ {
+		newplayer := new(Player)
+		newplayer.Name = names[x]
+		newplayer.Jobtxt = jobs[x]
+		players = append(players, newplayer)
+	}
+
+	return players
 }
 
 func GetDB(conn string) {
 	/*
 	This functtion is connects to the mysql database to store player names peristently 
+	The connection information is passed in as a commandline option(for now) format is...
+	<username>:<pw>@tcp(<HOST>:<port>)/<dbname>
+	This will be passed in through k8s in the end.
 	*/
 	db, err := sql.Open("mysql", conn)
 	if err != nil {
@@ -73,16 +96,18 @@ func GetDB(conn string) {
 }
 
 func main() {
-	names := make([]string,0)
-	jobs  := make([]string,0)
+	players := []*Player{}
 
-	// Check that we have something in the command line
+	/* Check that we have something in the command line
+	This should be the url to scrape
+	*/
 	if len(os.Args) > 1 {
-		names, jobs = FetchPage(os.Args[1])
+		players = FetchPage(os.Args[1])
 	}
-	fmt.Printf("%d Players seeking\n",len(names))
-	for x := 0; x < len(names); x++{
-		fmt.Printf(" Player: %s, is seeking on %s\n", names[x], jobs[x])
+	fmt.Printf("%d Players seeking\n",len(players))
+
+	for i := range(players) {
+		fmt.Printf("%s is seeking ---> Job is %s\n", players[i].Name, players[i].Jobtxt)
 	}
 	if len(os.Args) > 2 {
 		GetDB(os.Args[2])
