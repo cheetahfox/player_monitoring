@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"log"
 	"database/sql"
+	"strings"
+	"regexp"
+	"strconv"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/PuerkitoBio/goquery"
 )
@@ -20,7 +23,7 @@ type Player struct {
 	sublevel int
 }
 
-func FetchPage(url string) []*Player {
+func FetchPlayers(url string) []*Player {
 	/* This funciton is rather specific to the page I am scraping. We take the url 
 	and return two slices with players names and jobs that currently seeking 
 	party. 
@@ -75,6 +78,29 @@ func FetchPage(url string) []*Player {
 	return players
 }
 
+func Genjobs(user *Player) *Player {
+	// Split the jobtxt and 
+	jobs := strings.Split(user.Jobtxt, "/")
+
+	/* 
+	Since our data always has a / in it, we know we will have a slice with two strings
+	Index[0] is always going to be the mainjob level and [1] will always be the subjob
+	also setup the regex to match only numbers
+	*/
+	re := regexp.MustCompile("[0-9]+")
+	if mlevel, err := strconv.Atoi(re.FindString(jobs[0])); err == nil {
+		user.mainlevel = mlevel
+	}
+	if slevel, err := strconv.Atoi(re.FindString(jobs[1])); err == nil {
+		user.sublevel = slevel
+	}
+
+	re = regexp.MustCompile("[a-zA-Z]+")
+	user.mainjob = re.FindString(jobs[0])
+	user.subjob =  re.FindString(jobs[1])
+	return user
+}
+
 func GetDB(conn string) {
 	/*
 	This functtion is connects to the mysql database to store player names peristently 
@@ -102,12 +128,13 @@ func main() {
 	This should be the url to scrape
 	*/
 	if len(os.Args) > 1 {
-		players = FetchPage(os.Args[1])
+		players = FetchPlayers(os.Args[1])
 	}
 	fmt.Printf("%d Players seeking\n",len(players))
 
 	for i := range(players) {
-		fmt.Printf("%s is seeking ---> Job is %s\n", players[i].Name, players[i].Jobtxt)
+		//fmt.Printf("%s is seeking ---> Job is %s\n", players[i].Name, players[i].Jobtxt)
+		players[i] = Genjobs(players[i])
 	}
 	if len(os.Args) > 2 {
 		GetDB(os.Args[2])
