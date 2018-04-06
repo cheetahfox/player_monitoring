@@ -158,10 +158,16 @@ func main() {
 		panic(err.Error())
 	}
 
+	/* 
+	Get the players in the MySql Database, we pass along what we see from the fetch to 
+	update the database. By the time we get it here it is the most complete source of information
+	*/
 	db_players = GetDb(db, players)
 
+	fmt.Println("about to loop")
 	for i:= range(db_players) {
-		fmt.Printf("%s is seeking\n", db_players[i].Name)
+		crying_since := db_players[i].Started_seeking.Sub(db_players[i].Lastseen)
+		fmt.Printf("%s is seeking and they have been seeking %s\n", db_players[i].Name, crying_since)
 	}
 
 

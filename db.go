@@ -82,8 +82,8 @@ func AddMysqlPlayer(players []*Player, db *sql.DB) {
 		// Since this is the first time, Started seeking is going to be the same as lastseen
 		res, err := addplayer.Exec(players[i].Name, players[i].Lastseen, players[i].Lastseen, players[i].Jobtxt, players[i].Mainlevel, players[i].Sublevel, players[i].Mainjob, players[i].Subjob)
 		if err != nil {
+			log.Fatal(err)
 			fmt.Println(res.RowsAffected())
-			log.Fatal("Failed while adding a player")
 		}
 	}
 }
@@ -118,17 +118,6 @@ func GetDb(db *sql.DB, players []*Player) []*Player {
                 UpdateMysqlSeen(updateseen_players, db)
         }
 
-        // Check if current players are not in the database, add them to the db if they aren't
-        addplayers := []*Player{}
-        for i:= range(players) {
-                if PlayerinDB(players[i], db_players) != true {
-                        addplayers = append(addplayers, players[i])
-                }
-        }
-        if addplayers != nil {
-                AddMysqlPlayer(addplayers, db)
-        }
-
         // Check if the Database contains players that are not currently seeking, delete them from the DB if present
         deleteplayers := []*Player{}
         for i:= range(db_players) {
@@ -138,6 +127,17 @@ func GetDb(db *sql.DB, players []*Player) []*Player {
         }
         if deleteplayers != nil {
                 DeleteMysqlPlayer(deleteplayers, db)
+        }
+
+        // Check if current players are not in the database, add them to the db if they aren't
+        addplayers := []*Player{}
+        for i:= range(players) {
+                if PlayerinDB(players[i], db_players) != true {
+                        addplayers = append(addplayers, players[i])
+                }
+        }
+        if addplayers != nil {
+                AddMysqlPlayer(addplayers, db)
         }
 
 	// Refresh the now current list of players.
