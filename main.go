@@ -157,46 +157,12 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	// Get the users from the Mysql Database
-	db_players = GetMysqlPlayers(db)
+
+	db_players = GetDb(db, players)
+
 	for i:= range(db_players) {
-		fmt.Printf("%s is seeking ---> Job is %s\n", db_players[i].Name, db_players[i].Jobtxt)
+		fmt.Printf("%s is seeking\n", db_players[i].Name)
 	}
-
-	// Check if the current players are in the database, update them if they are
-	updateseen_players := []*Player{}
-	for i:= range(players) {
-		if PlayerinDB(players[i], db_players) == true {
-			updateseen_players = append(updateseen_players, players[i])
-		}
-	}
-	if updateseen_players != nil {
-		UpdateMysqlSeen(updateseen_players, db)
-	}
-
-	// Check if current players are not in the database, add them to the db if they aren't
-	addplayers := []*Player{}
-	for i:= range(players) {
-		if PlayerinDB(players[i], db_players) != true {
-			addplayers = append(addplayers, players[i])
-		}
-	}
-	if addplayers != nil {
-		AddMysqlPlayer(addplayers, db)
-	}
-
-	// Check if the Database contains players that are not currently seeking, delete them from the DB if present
-	deleteplayers := []*Player{}
-	for i:= range(db_players) {
-		if PlayerinDB(db_players[i], players) != true {
-			deleteplayers = append(deleteplayers, db_players[i])
-		}
-	}
-	if deleteplayers != nil {
-		DeleteMysqlPlayer(deleteplayers, db)
-	}
-
-
 
 
 

@@ -102,3 +102,45 @@ func DeleteMysqlPlayer(players []*Player, db *sql.DB) {
 	}
 }
 
+
+func GetDb(db *sql.DB, players []*Player) []*Player {
+        // Get the users from the Mysql Database
+        db_players := GetMysqlPlayers(db)
+
+        // Check if the current players are in the database, update them if they are
+        updateseen_players := []*Player{}
+        for i:= range(players) {
+                if PlayerinDB(players[i], db_players) == true {
+                        updateseen_players = append(updateseen_players, players[i])
+                }
+        }
+        if updateseen_players != nil {
+                UpdateMysqlSeen(updateseen_players, db)
+        }
+
+        // Check if current players are not in the database, add them to the db if they aren't
+        addplayers := []*Player{}
+        for i:= range(players) {
+                if PlayerinDB(players[i], db_players) != true {
+                        addplayers = append(addplayers, players[i])
+                }
+        }
+        if addplayers != nil {
+                AddMysqlPlayer(addplayers, db)
+        }
+
+        // Check if the Database contains players that are not currently seeking, delete them from the DB if present
+        deleteplayers := []*Player{}
+        for i:= range(db_players) {
+                if PlayerinDB(db_players[i], players) != true {
+                        deleteplayers = append(deleteplayers, db_players[i])
+                }
+        }
+        if deleteplayers != nil {
+                DeleteMysqlPlayer(deleteplayers, db)
+        }
+
+	// Refresh the now current list of players.
+	db_players = GetMysqlPlayers(db)
+	return db_players
+}
