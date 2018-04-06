@@ -5,10 +5,11 @@ import (
 	"os"
 	"net/http"
 	"log"
-	"database/sql"
 	"strings"
 	"regexp"
 	"strconv"
+	"time"
+	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/PuerkitoBio/goquery"
 )
@@ -17,10 +18,12 @@ import (
 type Player struct {
 	Name string
 	Jobtxt string
-	mainjob string
-	mainlevel int
-	subjob string
-	sublevel int
+	Mainjob string
+	Mainlevel int
+	Subjob string
+	Sublevel int
+	Lastseen time.Time
+	Started_seeking time.Time
 }
 
 func FetchPlayers(url string) []*Player {
@@ -68,10 +71,12 @@ func FetchPlayers(url string) []*Player {
 		}
 		})
 
+	now := time.Now()
 	for x := 0; x < len(names); x++ {
 		newplayer := new(Player)
 		newplayer.Name = names[x]
 		newplayer.Jobtxt = jobs[x]
+		newplayer.Lastseen = now
 		players = append(players, newplayer)
 	}
 
@@ -79,7 +84,7 @@ func FetchPlayers(url string) []*Player {
 }
 
 func Genjobs(user *Player) *Player {
-	// Split the jobtxt and 
+	// Split the jobtxt
 	jobs := strings.Split(user.Jobtxt, "/")
 
 	/* 
@@ -89,46 +94,44 @@ func Genjobs(user *Player) *Player {
 	*/
 	re := regexp.MustCompile("[0-9]+")
 	if mlevel, err := strconv.Atoi(re.FindString(jobs[0])); err == nil {
-		user.mainlevel = mlevel
+		user.Mainlevel = mlevel
 	}
 	if slevel, err := strconv.Atoi(re.FindString(jobs[1])); err == nil {
-		user.sublevel = slevel
+		user.Sublevel = slevel
 	}
 
 	re = regexp.MustCompile("[a-zA-Z]+")
-	user.mainjob = re.FindString(jobs[0])
-	user.subjob =  re.FindString(jobs[1])
+	user.Mainjob = re.FindString(jobs[0])
+	user.Subjob =  re.FindString(jobs[1])
 	return user
 }
 
-func GetDB(conn string) {
-	/*
-	This functtion is connects to the mysql database to store player names peristently 
-	The connection information is passed in as a commandline option(for now) format is...
-	<username>:<pw>@tcp(<HOST>:<port>)/<dbname>
-	This will be passed in through k8s in the end.
+func PlayerinDB( player *Player, db []*Player) (bool) {
+	/* 
+	This function checks to see if the player is in a different 
 	*/
-	db, err := sql.Open("mysql", conn)
-	if err != nil {
-		panic(err.Error())
+	for index := range(db) {
+		if player.Name == db[index].Name {
+			if player.Mainjob == db[index].Mainjob {
+				return true
+			}
+		}
 	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		panic(err.Error())
-	}
-	fmt.Printf("Database Open\n)")
+	return false
 }
 
 func main() {
-	players := []*Player{}
+	players    := []*Player{}
+	db_players := []*Player{}
 
+	fmt.Println(os.Getenv("MYSQL_DB"))
+	fmt.Println(os.Getenv("INFLUX_DB"))
+	fmt.Println(os.Getenv("PARTY_PAGE"))
 	/* Check that we have something in the command line
 	This should be the url to scrape
 	*/
-	if len(os.Args) > 1 {
-		players = FetchPlayers(os.Args[1])
+	if os.Getenv("PARTY_PAGE") != "" {
+		players = FetchPlayers(os.Getenv("PARTY_PAGE"))
 	}
 	fmt.Printf("%d Players seeking\n",len(players))
 
@@ -136,8 +139,68 @@ func main() {
 		//fmt.Printf("%s is seeking ---> Job is %s\n", players[i].Name, players[i].Jobtxt)
 		players[i] = Genjobs(players[i])
 	}
-	if len(os.Args) > 2 {
-		GetDB(os.Args[2])
+	/*
+	Check if we have the MySql enviromental variable set, Open the database if we do
+	*/
+	if os.Getenv("MYSQL_DB") == "" {
+		log.Fatal("No Mysql DB definded")
 	}
+
+        db, err := sql.Open("mysql", os.Getenv("MYSQL_DB"))
+        if err != nil {
+                log.Fatal("MySql DB failure %s", err)
+	        panic(err.Error())
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		panic(err.Error())
+	}
+	// Get the users from the Mysql Database
+	db_players = GetMysqlPlayers(db)
+	for i:= range(db_players) {
+		fmt.Printf("%s is seeking ---> Job is %s\n", db_players[i].Name, db_players[i].Jobtxt)
+	}
+
+	// Check if the current players are in the database, update them if they are
+	updateseen_players := []*Player{}
+	for i:= range(players) {
+		if PlayerinDB(players[i], db_players) == true {
+			updateseen_players = append(updateseen_players, players[i])
+		}
+	}
+	if updateseen_players != nil {
+		UpdateMysqlSeen(updateseen_players, db)
+	}
+
+	// Check if current players are not in the database, add them to the db if they aren't
+	addplayers := []*Player{}
+	for i:= range(players) {
+		if PlayerinDB(players[i], db_players) != true {
+			addplayers = append(addplayers, players[i])
+		}
+	}
+	if addplayers != nil {
+		AddMysqlPlayer(addplayers, db)
+	}
+
+	// Check if the Database contains players that are not currently seeking, delete them from the DB if present
+	deleteplayers := []*Player{}
+	for i:= range(db_players) {
+		if PlayerinDB(db_players[i], players) != true {
+			deleteplayers = append(deleteplayers, db_players[i])
+		}
+	}
+	if deleteplayers != nil {
+		DeleteMysqlPlayer(deleteplayers, db)
+	}
+
+
+
+
+
+
+
 
 }
