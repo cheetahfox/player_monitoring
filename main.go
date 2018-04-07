@@ -12,6 +12,7 @@ import (
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/influxdata/influxdb/client/v2"
 )
 
 // This is the main user data structure
@@ -120,12 +121,26 @@ func PlayerinDB( player *Player, db []*Player) (bool) {
 	return false
 }
 
+func PlayersBetween(low_l int, high_l int, db []*Player) int {
+	// Find the number of players between a range of levels
+	x := 0
+	for i := range(db) {
+		if (db[i].Mainlevel >= low_l) && (db[i].Mainlevel <= high_l) {
+			x++
+		}
+	}
+	return x
+}
+
 func main() {
 	players    := []*Player{}
 	db_players := []*Player{}
 
 	fmt.Println(os.Getenv("MYSQL_DB"))
 	fmt.Println(os.Getenv("INFLUX_DB"))
+	fmt.Println(os.Getenv("INFLUX_USERNAME"))
+	fmt.Println(os.Getenv("INFLUX_PASSWORD"))
+	fmt.Println(os.Getenv("INFLUX_ADDRESS"))
 	fmt.Println(os.Getenv("PARTY_PAGE"))
 	/* Check that we have something in the command line
 	This should be the url to scrape
@@ -163,12 +178,62 @@ func main() {
 	update the database. By the time we get it here it is the most complete source of information
 	*/
 	db_players = GetDb(db, players)
+	/*
+	p_seeking_11 := PlayersBetween( 1,  11, db_players)
+	p_seeking_19 := PlayersBetween( 12, 19, db_players)
+	p_seeking_29 := PlayersBetween( 20, 29, db_players)
+	p_seeking_39 := PlayersBetween( 30, 39, db_players)
+	p_seeking_49 := PlayersBetween( 40, 49, db_players)
+	p_seeking_59 := PlayersBetween( 50, 59, db_players)
+	p_seeking_69 := PlayersBetween( 60, 69, db_players)
+	p_seeking_74 := PlayersBetween( 70, 74, db_players)
+	p_seeking_75 := PlayersBetween( 75, 76, db_players)
+	*/
 
-	fmt.Println("about to loop")
+	group_crying := time.Duration(0)
 	for i:= range(db_players) {
-		crying_since := db_players[i].Started_seeking.Sub(db_players[i].Lastseen)
-		fmt.Printf("%s is seeking and they have been seeking %s\n", db_players[i].Name, crying_since)
+		crying_since := db_players[i].Lastseen.Sub(db_players[i].Started_seeking)
+		group_crying = group_crying + crying_since
 	}
+
+	// If you want to divide a Duration by some variable, you do it like this.
+	fmt.Printf("Total crying %s Average time to cry is %s\n", group_crying, group_crying/time.Duration(len(db_players)))
+
+	/*
+	influxconfig := make(client.HTTPConfig)
+	influxconfig.Addr     = os.Getenv("INFLUX_ADDRESS")
+	influxconfig.Username = os.Getenv("INFLUX_USERNAME")
+	influxconfig.Password = os.Getenv("INFLUX_PASSWORD")
+	influxconfig.Timeout  = time.Duration(60)
+	*/
+	conn, err := client.NewHTTPClient(client.HTTPConfig{
+		Addr: "http://monitoring.imagestream.com:8086",
+		Username: "josh",
+		Password: "fox",
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	q := client.NewQuery("Select last(\"value\") FROM \"nasomi\" WHERE(\"location\" = 'Nasomi' AND \"stat\" = 'population')", "nasomi", "s")
+	if response, err := conn.Query(q); err == nil && response.Error() == nil {
+		fmt.Printf("Number of items in Result %d\n", len(response.Results))
+		fmt.Println(response.Results)
+		fmt.Println(response.Results[0].Series[0].Values[0][1])
+	} else {
+		fmt.Println(err)
+		fmt.Println(response.Error())
+	}
+
+
+
+
+
+
+
+
+
 
 
 
