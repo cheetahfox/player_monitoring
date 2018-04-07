@@ -145,9 +145,10 @@ func main() {
 	/* Check that we have something in the command line
 	This should be the url to scrape
 	*/
-	if os.Getenv("PARTY_PAGE") != "" {
-		players = FetchPlayers(os.Getenv("PARTY_PAGE"))
+	if os.Getenv("PARTY_PAGE") == "" {
+		log.Fatal("No Url supplied to scrape")
 	}
+	players = FetchPlayers(os.Getenv("PARTY_PAGE"))
 	fmt.Printf("%d Players seeking\n",len(players))
 
 	for i := range(players) {

@@ -104,6 +104,15 @@ func DeleteMysqlPlayer(players []*Player, db *sql.DB) {
 
 
 func GetDb(db *sql.DB, players []*Player) []*Player {
+	/*
+	This funciton returns a cleaned up list of players in the persistent DB.
+	I take in the current scraped list of players because this function also 
+	performs all of the maintance on the DB. It updates players seek times.
+	Delets them from the DB if they aren't seeking on that job anymore.
+	Adds them if they are a new player and deletes them (which resets the seeking time)
+	if they are seeking for more than 10 hours. 
+	*/
+	const AFK_TIME = time.Duration(10h)
         // Get the users from the Mysql Database
         db_players := GetMysqlPlayers(db)
 
@@ -142,5 +151,21 @@ func GetDb(db *sql.DB, players []*Player) []*Player {
 
 	// Refresh the now current list of players.
 	db_players = GetMysqlPlayers(db)
+
+	// Check for AFK players, we delete any players that have been seeking for more than 10 hours
+	afkplayers := []*Player{}
+        for i:= range(db_players) {
+                crying_since := db_players[i].Lastseen.Sub(db_players[i].Started_seeking)
+		if crying_since >= AFK_TIME {
+			afkplayers = append(afkplayers, db_players[i])
+		}
+        }
+	if afkplayers != nil {
+		DeleteMysqlPlayer(afkplayers, db)
+	}
+
+	// Refresh the now current list of players.
+	db_players = GetMysqlPlayers(db)
+
 	return db_players
 }
