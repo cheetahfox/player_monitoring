@@ -174,6 +174,20 @@ func main() {
 		panic(err.Error())
 	}
 
+	// Open the influx Db conneciton
+	if os.Getenv("INFLUX_ADDRESS") == "" {
+		log.Fatal("No InfluxDb addess set")
+	}
+	conn, err := client.NewHTTPClient(client.HTTPConfig{
+		Addr:     os.Getenv("INFLUX_ADDRESS"),
+		Username: os.Getenv("INFLUX_USERNAME"),
+		Password: os.Getenv("INFLUX_PASSWORD"),
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
 	/* 
 	Get the players in the MySql Database, we pass along what we see from the fetch to 
 	update the database. By the time we get it here it is the most complete source of information
@@ -200,27 +214,9 @@ func main() {
 	// If you want to divide a Duration by some variable, you do it like this.
 	fmt.Printf("Total crying %s Average time to cry is %s\n", group_crying, group_crying/time.Duration(len(db_players)))
 
-	/*
-	influxconfig := make(client.HTTPConfig)
-	influxconfig.Addr     = os.Getenv("INFLUX_ADDRESS")
-	influxconfig.Username = os.Getenv("INFLUX_USERNAME")
-	influxconfig.Password = os.Getenv("INFLUX_PASSWORD")
-	influxconfig.Timeout  = time.Duration(60)
-	*/
-	conn, err := client.NewHTTPClient(client.HTTPConfig{
-		Addr: "http://monitoring.imagestream.com:8086",
-		Username: "josh",
-		Password: "fox",
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn.Close()
 
 	q := client.NewQuery("Select last(\"value\") FROM \"nasomi\" WHERE(\"location\" = 'Nasomi' AND \"stat\" = 'population')", "nasomi", "s")
 	if response, err := conn.Query(q); err == nil && response.Error() == nil {
-		fmt.Printf("Number of items in Result %d\n", len(response.Results))
-		fmt.Println(response.Results)
 		fmt.Println(response.Results[0].Series[0].Values[0][1])
 	} else {
 		fmt.Println(err)

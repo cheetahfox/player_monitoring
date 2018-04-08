@@ -112,9 +112,28 @@ func GetDb(db *sql.DB, players []*Player) []*Player {
 	Adds them if they are a new player and deletes them (which resets the seeking time)
 	if they are seeking for more than 10 hours. 
 	*/
-	const AFK_TIME = time.Duration(10h)
         // Get the users from the Mysql Database
         db_players := GetMysqlPlayers(db)
+
+	// Check for AFK players, we delete any players that have been seeking for more than 6 hours
+	// If they get deleted here, they will be readded, this should keep someone who is afk from messing with the average time
+	afkplayers := []*Player{}
+	now := time.Now()
+	dur, _ := time.ParseDuration("6h")
+	// invert the duration to be a -6 hour duration
+	if dur > 0 {
+		dur = -dur
+	}
+
+        for i:= range(db_players) {
+		afk_time := now.Add(dur)
+		if db_players[i].Started_seeking.Before(afk_time)  {
+			afkplayers = append(afkplayers, db_players[i])
+		}
+        }
+	if afkplayers != nil {
+		DeleteMysqlPlayer(afkplayers, db)
+	}
 
         // Check if the current players are in the database, update them if they are
         updateseen_players := []*Player{}
@@ -148,21 +167,6 @@ func GetDb(db *sql.DB, players []*Player) []*Player {
         if addplayers != nil {
                 AddMysqlPlayer(addplayers, db)
         }
-
-	// Refresh the now current list of players.
-	db_players = GetMysqlPlayers(db)
-
-	// Check for AFK players, we delete any players that have been seeking for more than 10 hours
-	afkplayers := []*Player{}
-        for i:= range(db_players) {
-                crying_since := db_players[i].Lastseen.Sub(db_players[i].Started_seeking)
-		if crying_since >= AFK_TIME {
-			afkplayers = append(afkplayers, db_players[i])
-		}
-        }
-	if afkplayers != nil {
-		DeleteMysqlPlayer(afkplayers, db)
-	}
 
 	// Refresh the now current list of players.
 	db_players = GetMysqlPlayers(db)
