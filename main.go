@@ -187,17 +187,6 @@ func main() {
 	update the database. By the time we get it here it is the most complete source of information
 	*/
 	db_players = GetDb(db, players)
-	/*
-	p_seeking_11 := PlayersBetween( 1,  11, db_players)
-	p_seeking_19 := PlayersBetween( 12, 19, db_players)
-	p_seeking_29 := PlayersBetween( 20, 29, db_players)
-	p_seeking_39 := PlayersBetween( 30, 39, db_players)
-	p_seeking_49 := PlayersBetween( 40, 49, db_players)
-	p_seeking_59 := PlayersBetween( 50, 59, db_players)
-	p_seeking_69 := PlayersBetween( 60, 69, db_players)
-	p_seeking_74 := PlayersBetween( 70, 74, db_players)
-	p_seeking_75 := PlayersBetween( 75, 76, db_players)
-	*/
 
 	group_crying := time.Duration(0)
 	for i:= range(db_players) {
@@ -275,6 +264,18 @@ func main() {
 	}
 	bp.AddPoint(pt)
 
+	// Ratio Active/Seeking divided by number of seeking players
+	ASvsSPop := AoverS / float64(len(db_players))
+	tags = map[string]string{"ASvsSPop":"Ratio"}
+	fields = map[string]interface{}{
+		"value": ASvsSPop,
+	}
+	pt, err = client.NewPoint("Stats", tags, fields, time.Now())
+	if err == nil {
+		fmt.Println("We added a point: ", pt.String())
+	}
+	bp.AddPoint(pt)
+
 	// Average Seeking Time 
 	tags = map[string]string{"Seeking_Time":"Average"}
 	fields = map[string]interface{}{
@@ -286,7 +287,21 @@ func main() {
 	}
 	bp.AddPoint(pt)
 
+	/*
+	Now we generate the info for the level ranges.
+	p_seeking_11 := PlayersBetween( 1,  11, db_players)
+	p_seeking_19 := PlayersBetween( 12, 19, db_players)
+	p_seeking_29 := PlayersBetween( 20, 29, db_players)
+	p_seeking_39 := PlayersBetween( 30, 39, db_players)
+	p_seeking_49 := PlayersBetween( 40, 49, db_players)
+	p_seeking_59 := PlayersBetween( 50, 59, db_players)
+	p_seeking_69 := PlayersBetween( 60, 69, db_players)
+	p_seeking_74 := PlayersBetween( 70, 74, db_players)
+	p_seeking_75 := PlayersBetween( 75, 76, db_players)
 
+	[]Levels
+
+	*/
 	if err := Conn.Write(bp); err != nil {
 		log.Fatal(err)
 	}
