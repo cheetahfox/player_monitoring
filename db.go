@@ -173,3 +173,4 @@ func GetDb(db *sql.DB, players []*Player) []*Player {
 
 	return db_players
 }
+
