@@ -88,12 +88,30 @@ func AddMysqlPlayer(players []*Player, db *sql.DB) {
 	}
 }
 
+func LogSeekingSession(session *Player, db *sql.DB) {
+	/*
+	This function creates a permanet log of each seeking session
+	this will be used in the future to do long term analysis of trends. 
+	*/
+	logsession, err := db.Prepare("INSERT INTO nasomi.Log_PLayers_Seeking set Name=?, Started_seeking=?, Last_seen=?, Mainjob_Level=?, Subjob_Level=?, Mainjob=?, Subjob=?")
+	if err != nil {
+		log.Fatal("Log Prepare Failure")
+	}
+	res, err := logsession.Exec(session.Name, session.Started_seeking, session.Lastseen, session.Mainlevel, session.Sublevel, session.Mainjob, session.Subjob)
+	if err != nil {
+		fmt.Println(res.RowsAffected())
+		log.Fatal("Failure to insert into long-term log")
+	}
+}
+
 func DeleteMysqlPlayer(players []*Player, db *sql.DB) {
 	deleteplayer, err := db.Prepare("DELETE FROM nasomi.Players_Seeking where Name=?")
 	if err != nil {
                 log.Fatal("Delete Player Prepare failure")
         }
 	for i:= range(players) {
+		// Log the session before deleting it
+		LogSeekingSession(players[i], db)
 		res, err := deleteplayer.Exec(players[i].Name)
 		if err != nil {
 			fmt.Println(res.RowsAffected())
@@ -110,23 +128,23 @@ func GetDb(db *sql.DB, players []*Player) []*Player {
 	performs all of the maintance on the DB. It updates players seek times.
 	Delets them from the DB if they aren't seeking on that job anymore.
 	Adds them if they are a new player and deletes them (which resets the seeking time)
-	if they are seeking for more than 10 hours. 
+	if they are seeking for more than 8 hours. 
 	*/
         // Get the users from the Mysql Database
         db_players := GetMysqlPlayers(db)
 
-	// Check for AFK players, we delete any players that have been seeking for more than 6 hours
+	// Check for AFK players, we delete any players that have been seeking for more than 8 hours
 	// If they get deleted here, they will be readded, this should keep someone who is afk from messing with the average time
 	afkplayers := []*Player{}
 	now := time.Now()
-	dur, _ := time.ParseDuration("6h")
-	// invert the duration to be a -6 hour duration
+	dur, _ := time.ParseDuration("8h")
+	// invert the duration to be a -8 hour duration
 	if dur > 0 {
 		dur = -dur
 	}
 
+	afk_time := now.Add(dur)
         for i:= range(db_players) {
-		afk_time := now.Add(dur)
 		if db_players[i].Started_seeking.Before(afk_time)  {
 			afkplayers = append(afkplayers, db_players[i])
 		}
