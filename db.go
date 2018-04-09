@@ -93,8 +93,9 @@ func LogSeekingSession(session *Player, db *sql.DB) {
 	This function creates a permanet log of each seeking session
 	this will be used in the future to do long term analysis of trends. 
 	*/
-	logsession, err := db.Prepare("INSERT INTO nasomi.Log_PLayers_Seeking set Name=?, Started_seeking=?, Last_seen=?, Mainjob_Level=?, Subjob_Level=?, Mainjob=?, Subjob=?")
+	logsession, err := db.Prepare("INSERT INTO nasomi.Log_Players_Seeking set Name=?, Started_seeking=?, Last_seen=?, Mainjob_Level=?, Subjob_Level=?, Mainjob=?, Subjob=?")
 	if err != nil {
+		fmt.Println(err)
 		log.Fatal("Log Prepare Failure")
 	}
 	res, err := logsession.Exec(session.Name, session.Started_seeking, session.Lastseen, session.Mainlevel, session.Sublevel, session.Mainjob, session.Subjob)
