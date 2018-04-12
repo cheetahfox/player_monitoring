@@ -9,11 +9,8 @@ import (
 	"regexp"
 	"strconv"
 	"time"
-	"database/sql"
-	"encoding/json"
-	_ "github.com/go-sql-driver/mysql"
+	//"reflect"
 	"github.com/PuerkitoBio/goquery"
-	"github.com/influxdata/influxdb/client/v2"
 )
 
 // This is the main user data structure
@@ -149,38 +146,15 @@ func main() {
 		//fmt.Printf("%s is seeking ---> Job is %s\n", players[i].Name, players[i].Jobtxt)
 		players[i] = Genjobs(players[i])
 	}
-	/*
-	Check if we have the MySql enviromental variable set, Open the database if we do
-	*/
-	if os.Getenv("MYSQL_DB") == "" {
-		log.Fatal("No Mysql DB definded")
-	}
 
-        db, err := sql.Open("mysql", os.Getenv("MYSQL_DB"))
-        if err != nil {
-                log.Fatal("MySql DB failure %s", err)
-	        panic(err.Error())
-	}
+	// Connect to the MySql database
+	db := ConnectMySql()
 	defer db.Close()
 
-	err = db.Ping()
-	if err != nil {
-		panic(err.Error())
-	}
 
-	// Open the influx Db conneciton
-	if os.Getenv("INFLUX_ADDRESS") == "" {
-		log.Fatal("No InfluxDb addess set")
-	}
-	Conn, err := client.NewHTTPClient(client.HTTPConfig{
-		Addr:     os.Getenv("INFLUX_ADDRESS"),
-		Username: os.Getenv("INFLUX_USERNAME"),
-		Password: os.Getenv("INFLUX_PASSWORD"),
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer Conn.Close()
+	// Open influxdb
+	conn := ConnectInfluxdb()
+	defer conn.Close()
 
 	/* 
 	Get the players in the MySql Database, we pass along what we see from the fetch to 
@@ -198,94 +172,17 @@ func main() {
 	// If you want to divide a Duration by some variable, you do it like this.
 	fmt.Printf("Total crying %s Average time to cry is %s\n", group_crying, average_crying)
 
-        var Total_online float64
-        /*
-        Get the toal number of people online from the Influxdb database
-        */
-        q := client.NewQuery("Select last(\"value\") FROM \"nasomi\" WHERE(\"location\" = 'Nasomi' AND \"stat\" = 'population')", "nasomi", "s")
-        if response, err := Conn.Query(q); err == nil && response.Error() == nil {
-                data, err :=  response.Results[0].Series[0].Values[0][1].(json.Number).Float64()
-                if err != nil {
-                        log.Fatal("json.number failed in influxdb response")
-                }
-                Total_online = data
-        } else {
-                fmt.Println(err)
-                fmt.Println(response.Error())
-        }
-
-        var Total_active float64
-        /*
-        Get the toal number of people online from the Influxdb database
-        */
-        q = client.NewQuery("Select last(\"value\") FROM \"nasomi\" WHERE(\"location\" = 'Nasomi' AND \"stat\" = 'intown')", "nasomi", "s")
-        if response, err := Conn.Query(q); err == nil && response.Error() == nil {
-                data, err :=  response.Results[0].Series[0].Values[0][1].(json.Number).Float64()
-                if err != nil {
-                        log.Fatal("json.number failed in influxdb response")
-                }
-                Total_active = data
-        } else {
-                fmt.Println(err)
-                fmt.Println(response.Error())
-        }
+	// Get the total People online
+        Total_online := GetNasomiPop(conn)
 
 	PoverS := Total_online / float64(len(db_players))
-	AoverS := Total_active / float64(len(db_players))
-	fmt.Printf("Total seeking : %d Ratio of pop/seeking: %1f, Ratio of active/seeking %1f\n", len(db_players), PoverS, AoverS )
+	fmt.Printf("Total seeking : %d Ratio of pop/seeking: %1f\n", len(db_players), PoverS )
 
-	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
-		Database: os.Getenv("INFLUX_DB"),
-		Precision: "s",
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Ratio Populaiton Total over Seeking
-	tags := map[string]string{"Ratio_PS":"Ratio"}
-	fields := map[string]interface{}{
-		"value": PoverS,
-	}
-	pt, err := client.NewPoint("Stats", tags, fields, time.Now())
-	if err == nil {
-		fmt.Println("We added a point: ", pt.String())
-	}
-	bp.AddPoint(pt)
-
-	// Ratio Active over Seeking
-	tags = map[string]string{"Ratio_AS":"Ratio"}
-	fields = map[string]interface{}{
-		"value": AoverS,
-	}
-	pt, err = client.NewPoint("Stats", tags, fields, time.Now())
-	if err == nil {
-		fmt.Println("We added a point: ", pt.String())
-	}
-	bp.AddPoint(pt)
-
-	// Ratio Active/Seeking divided by number of seeking players
-	ASvsSPop := AoverS / float64(len(db_players))
-	tags = map[string]string{"ASvsSPop":"Ratio"}
-	fields = map[string]interface{}{
-		"value": ASvsSPop,
-	}
-	pt, err = client.NewPoint("Stats", tags, fields, time.Now())
-	if err == nil {
-		fmt.Println("We added a point: ", pt.String())
-	}
-	bp.AddPoint(pt)
+	// Add PoverS to the Batch point
+	WriteInflux2Tfl(conn, "Stats", "Ratio_PS", "Ratio", PoverS)
 
 	// Average Seeking Time 
-	tags = map[string]string{"Seeking_Time":"Average"}
-	fields = map[string]interface{}{
-		"value": average_crying.Seconds(),
-	}
-	pt, err = client.NewPoint("Stats", tags, fields, time.Now())
-	if err == nil {
-		fmt.Println("We added a point: ", pt.String())
-	}
-	bp.AddPoint(pt)
+	WriteInflux2Tfl(conn, "Stats", "Seeking_Time", "Average", average_crying.Seconds())
 
 	/*
 	Now we generate the info for the level ranges.
@@ -302,9 +199,6 @@ func main() {
 	[]Levels
 
 	*/
-	if err := Conn.Write(bp); err != nil {
-		log.Fatal(err)
-	}
 
 
 

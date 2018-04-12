@@ -4,9 +4,51 @@ import (
         "fmt"
         "log"
 	"time"
+	"os"
         "database/sql"
+	"encoding/json"
         _ "github.com/go-sql-driver/mysql"
+	"github.com/influxdata/influxdb/client/v2"
 )
+
+
+func ConnectInfluxdb() client.Client {
+	// Open the influx Db conneciton
+        if os.Getenv("INFLUX_ADDRESS") == "" {
+                log.Fatal("No InfluxDb addess set")
+        }
+        Conn, err := client.NewHTTPClient(client.HTTPConfig{
+                Addr:     os.Getenv("INFLUX_ADDRESS"),
+                Username: os.Getenv("INFLUX_USERNAME"),
+                Password: os.Getenv("INFLUX_PASSWORD"),
+        })
+        if err != nil {
+                log.Fatal(err)
+        }
+	return Conn
+}
+
+func ConnectMySql() *sql.DB {
+        /*
+	This function opens the MySql DB
+        Check if we have the MySql enviromental variable set, Open the database if we do
+        */
+        if os.Getenv("MYSQL_DB") == "" {
+                log.Fatal("No Mysql DB definded")
+        }
+
+        db, err := sql.Open("mysql", os.Getenv("MYSQL_DB"))
+        if err != nil {
+                log.Fatal("MySql DB failure %s", err)
+                panic(err.Error())
+        }
+
+        err = db.Ping()
+        if err != nil {
+                panic(err.Error())
+        }
+	return db
+}
 
 func GetMysqlPlayers(db *sql.DB) []*Player {
 	var (
@@ -193,3 +235,48 @@ func GetDb(db *sql.DB, players []*Player) []*Player {
 	return db_players
 }
 
+func WriteInflux2Tfl(conn client.Client, measure string, tag1 string, tag2 string, value float64) {
+	/*
+	This function takes a single float64 value and writes it into the InfluxDb with two tags.
+	This is useful since I often only want to write a single value.
+	*/
+        bp, err := client.NewBatchPoints(client.BatchPointsConfig{
+                Database: os.Getenv("INFLUX_DB"),
+                Precision: "s",
+        })
+        if err != nil {
+                log.Fatal(err)
+        }
+
+        tags := map[string]string{tag1:tag2}
+        fields := map[string]interface{}{
+                "value": value,
+        }
+        pt, err := client.NewPoint(measure, tags, fields, time.Now())
+        if err == nil {
+                fmt.Println("We added a point: ", pt.String())
+        }
+        bp.AddPoint(pt)
+
+        if err := conn.Write(bp); err != nil {
+                log.Fatal(err)
+        }
+}
+
+func GetNasomiPop(conn client.Client ) float64 {
+        /*
+        Get the toal number of people online from the Influxdb database
+        */
+	var Total_pop float64
+        q := client.NewQuery("Select last(\"value\") FROM \"nasomi\" WHERE(\"location\" = 'Nasomi' AND \"stat\" = 'population')", "nasomi", "s")
+        if response, err := conn.Query(q); err == nil && response.Error() == nil {
+                data, err :=  response.Results[0].Series[0].Values[0][1].(json.Number).Float64()
+                if err != nil {
+                        log.Fatal("json.number failed in influxdb response")
+                }
+		Total_pop = data
+        } else {
+                log.Fatal(response.Error(), err)
+        }
+	return Total_pop
+}
