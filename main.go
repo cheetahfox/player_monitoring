@@ -25,6 +25,11 @@ type Player struct {
 	Started_seeking time.Time
 }
 
+type P_Dist struct {
+	Player_Level int
+	pop string
+}
+
 func FetchPlayers(url string) []*Player {
 	/* This funciton is rather specific to the page I am scraping. We take the url 
 	and return two slices with players names and jobs that currently seeking 
@@ -82,6 +87,82 @@ func FetchPlayers(url string) []*Player {
 	return players
 }
 
+func FetchDistribution(url string) []*P_Dist {
+	/*
+	This function returns a slice of Player Distributions
+	*/
+	Distribution := []*P_Dist{}
+
+        res, err := http.Get(url)
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer res.Body.Close()
+        if res.StatusCode != 200 {
+                log.Fatal("Request Status code %d %s", res.StatusCode, res.Status)
+        }
+
+	// Load the HTML to parse
+        doc, err := goquery.NewDocumentFromReader(res.Body)
+        if err != nil {
+                log.Fatal(err)
+        }
+
+	doc.Find("td").Each(func(i int, s *goquery.Selection) {
+	var Level int
+	var Pop string
+	switch i {
+		// Levels < 12
+		case 27:
+			Level = 12
+			Pop   = s.Text()
+		// Levels 12 - 19
+		case 28:
+			Level = 19
+			Pop   = s.Text()
+		// Levels 20 - 29 
+		case 29:
+			Level = 29
+			Pop   = s.Text()
+		// Levels 30 - 39
+		case 30:
+			Level = 39
+			Pop   = s.Text()
+		// Levels 40 - 49
+		case 31:
+			Level = 49
+			Pop   = s.Text()
+		// Levels 50 - 59
+		case 32:
+			Level = 59
+			Pop   = s.Text()
+		// Levels 60 - 69
+		case 33:
+			Level = 69
+			Pop   = s.Text()
+		// Levels 70 - 74
+		case 34:
+			Level = 74
+			Pop   = s.Text()
+		// Level 75
+		case 35:
+			Level = 75
+			Pop   = s.Text()
+	}
+	if Level != 0 {
+		newdist := new(P_Dist)
+		newdist.Player_Level = Level
+		newdist.pop   = Pop
+		Distribution = append(Distribution, newdist)
+	}
+	})
+	for i := range(Distribution) {
+		fmt.Printf("Player levels %d  Population is %s\n", Distribution[i].Player_Level, Distribution[i].pop)
+	}
+	log.Fatal("done")
+	return Distribution
+}
+
 func Genjobs(user *Player) *Player {
 	// Split the jobtxt
 	jobs := strings.Split(user.Jobtxt, "/")
@@ -133,6 +214,7 @@ func PlayersBetween(low_l int, high_l int, db []*Player) int {
 func main() {
 	players    := []*Player{}
 	db_players := []*Player{}
+	player_distribution := []*P_Dist{}
 
 	/* Check that we have something in the command line
 	This should be the url to scrape
@@ -147,10 +229,20 @@ func main() {
 		players[i] = Genjobs(players[i])
 	}
 
+	if os.Getenv("STATUS_PAGE") == "" {
+		log.Fatal("No Url for status page")
+	}
+	player_distribution = FetchDistribution(os.Getenv("STATUS_PAGE"))
+
+	if player_distribution != nil {
+		for i := range(player_distribution) {
+			fmt.Println(player_distribution[i].pop)
+		}
+	}
+
 	// Connect to the MySql database
 	db := ConnectMySql()
 	defer db.Close()
-
 
 	// Open influxdb
 	conn := ConnectInfluxdb()
