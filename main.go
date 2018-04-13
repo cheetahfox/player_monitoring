@@ -256,6 +256,7 @@ func main() {
 	db_players := []*Player{}
 	player_distribution := []*P_Dist{}
 	seeking_distribution := []*P_Dist{}
+	fmt.Println("Playermon startup version 0.01")
 
 	/* Check that we have something in the command line
 	This should be the url to scrape
@@ -294,7 +295,7 @@ func main() {
 
 	/* 
 	Write both of the Player and Seeking Distributions into the influxdb database
-	*/ 
+	*/
 	for i:= range(player_distribution) {
 		pd_value, err := strconv.Atoi(player_distribution[i].pop)
 		if err == nil {
