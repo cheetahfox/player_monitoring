@@ -235,7 +235,7 @@ func GetDb(db *sql.DB, players []*Player) []*Player {
 	return db_players
 }
 
-func WriteInflux2Tfl(conn client.Client, measure string, tag1 string, tag2 string, value float64) {
+func WriteInflux1Tfl(conn client.Client, measure string, tag1 string, tag2 string, value float64) {
 	/*
 	This function takes a single float64 value and writes it into the InfluxDb with two tags.
 	This is useful since I often only want to write a single value.
@@ -253,8 +253,8 @@ func WriteInflux2Tfl(conn client.Client, measure string, tag1 string, tag2 strin
                 "value": value,
         }
         pt, err := client.NewPoint(measure, tags, fields, time.Now())
-        if err == nil {
-                fmt.Println("We added a point: ", pt.String())
+        if err != nil {
+                log.Fatal(err)
         }
         bp.AddPoint(pt)
 
@@ -279,4 +279,33 @@ func GetNasomiPop(conn client.Client ) float64 {
                 log.Fatal(response.Error(), err)
         }
 	return Total_pop
+}
+
+func WriteInflux2Tint(conn client.Client, measure string, tag string, tag_value string, tag2 string, tag2_value string, int_value int) {
+	/*
+	This function takes a single float64 value and writes it into the InfluxDb with two tags.
+	This is useful since I often only want to write a single value.
+	*/
+	value := float64(int_value)
+        bp, err := client.NewBatchPoints(client.BatchPointsConfig{
+                Database: os.Getenv("INFLUX_DB"),
+                Precision: "s",
+        })
+        if err != nil {
+                log.Fatal(err)
+        }
+
+        tags := map[string]string{tag:tag_value,tag2:tag2_value}
+        fields := map[string]interface{}{
+                "value": value,
+        }
+        pt, err := client.NewPoint(measure, tags, fields, time.Now())
+        if err != nil {
+                log.Fatal(err)
+        }
+        bp.AddPoint(pt)
+
+        if err := conn.Write(bp); err != nil {
+                log.Fatal(err)
+        }
 }

@@ -114,7 +114,7 @@ func FetchDistribution(url string) []*P_Dist {
 	switch i {
 		// Levels < 12
 		case 27:
-			Level = 12
+			Level = 11
 			Pop   = s.Text()
 		// Levels 12 - 19
 		case 28:
@@ -156,10 +156,6 @@ func FetchDistribution(url string) []*P_Dist {
 		Distribution = append(Distribution, newdist)
 	}
 	})
-	for i := range(Distribution) {
-		fmt.Printf("Player levels %d  Population is %s\n", Distribution[i].Player_Level, Distribution[i].pop)
-	}
-	log.Fatal("done")
 	return Distribution
 }
 
@@ -200,21 +196,66 @@ func PlayerinDB( player *Player, db []*Player) (bool) {
 	return false
 }
 
-func PlayersBetween(low_l int, high_l int, db []*Player) int {
+func PlayersBetween(low_l int, high_l int, db_players []*Player) int {
 	// Find the number of players between a range of levels
 	x := 0
-	for i := range(db) {
-		if (db[i].Mainlevel >= low_l) && (db[i].Mainlevel <= high_l) {
+	for i := range(db_players) {
+		if (db_players[i].Mainlevel >= low_l) && (db_players[i].Mainlevel <= high_l) {
 			x++
 		}
 	}
 	return x
 }
 
+func SeekingDistribution(db_players []*Player) []*P_Dist {
+	Distribution := []*P_Dist{}
+	Level_Ranges := []int{11,19,29,39,49,59,69,74,75}
+	/*
+	Now we generate the info for the level ranges.
+	*/
+	for i:= range(Level_Ranges) {
+		/* 
+		We are going to do a few different things based on which range we are looking.
+		Most of the levels are handled by the default case but, 1-11, 12-19, 70-47 and 75
+		need different logic. I don't like this but I think this is the cleanest way to handle
+		this code. Out of the nine possible cases five of them are handled by the default case
+		*/
+		switch Level_Ranges[i] {
+			case 11:
+				newdist := new(P_Dist)
+				newdist.Player_Level = Level_Ranges[i]
+				newdist.pop = strconv.Itoa(PlayersBetween( 1,  Level_Ranges[i], db_players))
+				Distribution = append(Distribution, newdist)
+			case 19:
+				newdist := new(P_Dist)
+				newdist.Player_Level = Level_Ranges[i]
+				newdist.pop = strconv.Itoa(PlayersBetween( 12,  Level_Ranges[i], db_players))
+				Distribution = append(Distribution, newdist)
+			case 74:
+				newdist := new(P_Dist)
+				newdist.Player_Level = Level_Ranges[i]
+				newdist.pop = strconv.Itoa(PlayersBetween( 70,  Level_Ranges[i], db_players))
+				Distribution = append(Distribution, newdist)
+			case 75:
+				newdist := new(P_Dist)
+				newdist.Player_Level = Level_Ranges[i]
+				newdist.pop = strconv.Itoa(PlayersBetween( Level_Ranges[i], 76 , db_players))
+				Distribution = append(Distribution, newdist)
+			default:
+				newdist := new(P_Dist)
+				newdist.Player_Level = Level_Ranges[i]
+				newdist.pop = strconv.Itoa(PlayersBetween( Level_Ranges[i]-9,  Level_Ranges[i], db_players))
+				Distribution = append(Distribution, newdist)
+		}
+	}
+	return Distribution
+}
+
 func main() {
 	players    := []*Player{}
 	db_players := []*Player{}
 	player_distribution := []*P_Dist{}
+	seeking_distribution := []*P_Dist{}
 
 	/* Check that we have something in the command line
 	This should be the url to scrape
@@ -234,12 +275,6 @@ func main() {
 	}
 	player_distribution = FetchDistribution(os.Getenv("STATUS_PAGE"))
 
-	if player_distribution != nil {
-		for i := range(player_distribution) {
-			fmt.Println(player_distribution[i].pop)
-		}
-	}
-
 	// Connect to the MySql database
 	db := ConnectMySql()
 	defer db.Close()
@@ -253,6 +288,29 @@ func main() {
 	update the database. By the time we get it here it is the most complete source of information
 	*/
 	db_players = GetDb(db, players)
+
+	// Get the player/level distribution of seeking players.
+	seeking_distribution = SeekingDistribution(db_players)
+
+	/* 
+	Write both of the Player and Seeking Distributions into the influxdb database
+	*/ 
+	for i:= range(player_distribution) {
+		pd_value, err := strconv.Atoi(player_distribution[i].pop)
+		if err == nil {
+			player_dist_level := strconv.Itoa(player_distribution[i].Player_Level)
+			WriteInflux2Tint(conn, "Stats", "Player_Distribution","Online", "Level", player_dist_level, pd_value)
+		} else {
+			fmt.Println("Error strcon", err)
+		}
+	}
+	for i:= range(seeking_distribution) {
+		sd_value, err := strconv.Atoi(seeking_distribution[i].pop)
+		if err == nil {
+			seeking_dist_level := strconv.Itoa(seeking_distribution[i].Player_Level)
+			WriteInflux2Tint(conn, "Stats", "Player_Distribution", "Seeking", "Level", seeking_dist_level, sd_value)
+		}
+	}
 
 	group_crying := time.Duration(0)
 	for i:= range(db_players) {
@@ -271,31 +329,10 @@ func main() {
 	fmt.Printf("Total seeking : %d Ratio of pop/seeking: %1f\n", len(db_players), PoverS )
 
 	// Add PoverS to the Batch point
-	WriteInflux2Tfl(conn, "Stats", "Ratio_PS", "Ratio", PoverS)
+	WriteInflux1Tfl(conn, "Stats", "Ratio_PS", "Ratio", PoverS)
 
 	// Average Seeking Time 
-	WriteInflux2Tfl(conn, "Stats", "Seeking_Time", "Average", average_crying.Seconds())
-
-	/*
-	Now we generate the info for the level ranges.
-	p_seeking_11 := PlayersBetween( 1,  11, db_players)
-	p_seeking_19 := PlayersBetween( 12, 19, db_players)
-	p_seeking_29 := PlayersBetween( 20, 29, db_players)
-	p_seeking_39 := PlayersBetween( 30, 39, db_players)
-	p_seeking_49 := PlayersBetween( 40, 49, db_players)
-	p_seeking_59 := PlayersBetween( 50, 59, db_players)
-	p_seeking_69 := PlayersBetween( 60, 69, db_players)
-	p_seeking_74 := PlayersBetween( 70, 74, db_players)
-	p_seeking_75 := PlayersBetween( 75, 76, db_players)
-
-	[]Levels
-
-	*/
-
-
-
-
-
+	WriteInflux1Tfl(conn, "Stats", "Seeking_Time", "Average", average_crying.Seconds())
 
 
 
