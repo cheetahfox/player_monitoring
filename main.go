@@ -108,9 +108,11 @@ func FetchDistribution(url string) []*P_Dist {
                 log.Fatal(err)
         }
 
+	fmt.Printf("Before status parse|n")
 	doc.Find("td").Each(func(i int, s *goquery.Selection) {
 	var Level int
 	var Pop string
+	fmt.Printf("Index %d, %s\n", i, s.Text())
 	switch i {
 		// Levels < 12
 		case 27:
@@ -256,7 +258,7 @@ func main() {
 	db_players := []*Player{}
 	player_distribution := []*P_Dist{}
 	seeking_distribution := []*P_Dist{}
-	fmt.Println("Playermon startup version 0.01")
+	fmt.Println("Playermon startup version 0.02")
 
 	/* Check that we have something in the command line
 	This should be the url to scrape
@@ -310,6 +312,8 @@ func main() {
 		if err == nil {
 			seeking_dist_level := strconv.Itoa(seeking_distribution[i].Player_Level)
 			WriteInflux2Tint(conn, "Stats", "Player_Distribution", "Seeking", "Level", seeking_dist_level, sd_value)
+		} else {
+			fmt.Println(err)
 		}
 	}
 
