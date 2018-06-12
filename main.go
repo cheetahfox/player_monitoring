@@ -13,6 +13,8 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+const Version = 0.04
+
 // This is the main user data structure
 type Player struct {
 	Name string
@@ -87,12 +89,36 @@ func FetchPlayers(url string) []*Player {
 	return players
 }
 
-func FetchDistribution(url string) []*P_Dist {
+func FetchDistribution(Stats map[string]int) []*P_Dist {
 	/*
 	This function returns a slice of Player Distributions
+	It's a Wraper function that allows the rest of the program to work given that I should have been using 
+	maps to store my data when I was parsing the Url (done now in FetchStats). But because I didn't really
+	know about Maps (I am new at GO) I was doing it in a more complicated way. Eventially I will rewrite 
+	everything else to use maps but for now this takes the map in and generates the Slice of P_Dist's 
 	*/
-	Distribution := []*P_Dist{}
 
+	Distribution := []*P_Dist{}
+	Level_Ranges := []int{11,19,29,39,49,59,69,74,75}
+
+	for i:= range(Level_Ranges) {
+		newdist := new(P_Dist)
+		newdist.Player_Level = i
+		Player_Level :=  strconv.Itoa(i)
+		pop := strconv.Itoa(Stats["Dist_level_" + Player_Level])
+		newdist.pop = pop
+		Distribution = append(Distribution, newdist)
+	}
+
+	return Distribution
+}
+
+func FetchStats(url string) map[string]int {
+	/*
+	This function parses the Nasomi Stats Page. The specific format is driven by Nasomi's page
+	If he changes the format, this will need to be adjusted 
+	*/
+	Stats := make(map[string]int)
         res, err := http.Get(url)
         if err != nil {
                 log.Fatal(err)
@@ -108,57 +134,84 @@ func FetchDistribution(url string) []*P_Dist {
                 log.Fatal(err)
         }
 
-	fmt.Printf("Before status parse|n")
+	// Regex to match non-nummeric chars
+        re := regexp.MustCompile("[,a-zA-Z]")
+
 	doc.Find("td").Each(func(i int, s *goquery.Selection) {
-	var Level int
-	var Pop string
-	fmt.Printf("Index %d, %s\n", i, s.Text())
-	switch i {
-		// Levels < 12
-		case 27:
-			Level = 11
-			Pop   = s.Text()
-		// Levels 12 - 19
-		case 28:
-			Level = 19
-			Pop   = s.Text()
-		// Levels 20 - 29 
-		case 29:
-			Level = 29
-			Pop   = s.Text()
-		// Levels 30 - 39
-		case 30:
-			Level = 39
-			Pop   = s.Text()
-		// Levels 40 - 49
-		case 31:
-			Level = 49
-			Pop   = s.Text()
-		// Levels 50 - 59
-		case 32:
-			Level = 59
-			Pop   = s.Text()
-		// Levels 60 - 69
-		case 33:
-			Level = 69
-			Pop   = s.Text()
-		// Levels 70 - 74
-		case 34:
-			Level = 74
-			Pop   = s.Text()
-		// Level 75
-		case 35:
-			Level = 75
-			Pop   = s.Text()
-	}
-	if Level != 0 {
-		newdist := new(P_Dist)
-		newdist.Player_Level = Level
-		newdist.pop   = Pop
-		Distribution = append(Distribution, newdist)
-	}
-	})
-	return Distribution
+		switch i {
+			// Number of AH Transacatons
+			case 6:
+				if sales, err := strconv.Atoi(re.ReplaceAllString(s.Text(), "")); err == nil {
+					Stats["AH_Transactions"] = sales
+				}
+			// Amount of AH gil exchanged
+			case 8:
+				if gil, err := strconv.Atoi(re.ReplaceAllString(s.Text(), "")); err == nil {
+					Stats["AH_gil"] = gil
+				}
+			// Mobs killed
+			case 11:
+				if mob_death, err := strconv.Atoi(re.ReplaceAllString(s.Text(), "")); err == nil {
+					Stats["Mob_Deaths"] = mob_death
+				}
+			// Player Deaths
+			case 15:
+				if player_death, err := strconv.Atoi(re.ReplaceAllString(s.Text(), "")); err == nil {
+					Stats["Mob_Deaths"] = player_death
+				}
+			// Levels < 12
+			case 27:
+				if pop, err := strconv.Atoi(re.ReplaceAllString(s.Text(), "")); err == nil {
+					Stats["Dist_level_11"] = pop
+				}
+			// Levels 12 - 19
+			case 28:
+				if pop, err := strconv.Atoi(re.ReplaceAllString(s.Text(), "")); err == nil {
+					Stats["Dist_level_19"] = pop
+				}
+			// Levels 20 - 29 
+			case 29:
+				if pop, err := strconv.Atoi(re.ReplaceAllString(s.Text(), "")); err == nil {
+					Stats["Dist_level_29"] = pop
+				}
+			// Levels 30 - 39
+			case 30:
+				if pop, err := strconv.Atoi(re.ReplaceAllString(s.Text(), "")); err == nil {
+					Stats["Dist_level_39"] = pop
+				}
+			// Levels 40 - 49
+			case 31:
+				if pop, err := strconv.Atoi(re.ReplaceAllString(s.Text(), "")); err == nil {
+					Stats["Dist_level_49"] = pop
+				}
+			// Levels 50 - 59
+			case 32:
+				if pop, err := strconv.Atoi(re.ReplaceAllString(s.Text(), "")); err == nil {
+					Stats["Dist_level_59"] = pop
+				}
+			// Levels 60 - 69
+			case 33:
+				if pop, err := strconv.Atoi(re.ReplaceAllString(s.Text(), "")); err == nil {
+					Stats["Dist_level_69"] = pop
+				}
+			// Levels 70 - 74
+			case 34:
+				if pop, err := strconv.Atoi(re.ReplaceAllString(s.Text(), "")); err == nil {
+					Stats["Dist_level_74"] = pop
+				}
+			// Level 75
+			case 35:
+				if pop, err := strconv.Atoi(re.ReplaceAllString(s.Text(), "")); err == nil {
+					Stats["Dist_level_75"] = pop
+				}
+			// Total Current population
+			case 36:
+				if pop, err := strconv.Atoi(re.ReplaceAllString(s.Text(), "")); err == nil {
+					Stats["Current_Population"] = pop
+				}
+		}
+		})
+	return Stats
 }
 
 func Genjobs(user *Player) *Player {
@@ -258,7 +311,7 @@ func main() {
 	db_players := []*Player{}
 	player_distribution := []*P_Dist{}
 	seeking_distribution := []*P_Dist{}
-	fmt.Println("Playermon startup version 0.02")
+	fmt.Printf("Playermon startup version %ld\n", Version)
 
 	/* Check that we have something in the command line
 	This should be the url to scrape
@@ -276,7 +329,13 @@ func main() {
 	if os.Getenv("STATUS_PAGE") == "" {
 		log.Fatal("No Url for status page")
 	}
-	player_distribution = FetchDistribution(os.Getenv("STATUS_PAGE"))
+
+	Stats := make(map[string]int)
+	Stats = FetchStats(os.Getenv("STATUS_PAGE"))
+
+	fmt.Println(Stats["Current_Population"])
+
+	player_distribution = FetchDistribution(Stats)
 
 	// Connect to the MySql database
 	db := ConnectMySql()
