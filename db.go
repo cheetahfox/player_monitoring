@@ -270,10 +270,11 @@ func GetNasomiPop(conn client.Client ) float64 {
 	var Total_pop float64
         q := client.NewQuery("Select last(\"value\") FROM \"nasomi\" WHERE(\"location\" = 'Nasomi' AND \"stat\" = 'population')", "nasomi", "s")
         if response, err := conn.Query(q); err == nil && response.Error() == nil {
-                Total_pop, err :=  response.Results[0].Series[0].Values[0][1].(json.Number).Float64()
+                data, err :=  response.Results[0].Series[0].Values[0][1].(json.Number).Float64()
                 if err != nil {
                         log.Fatal("json.number failed in influxdb response")
                 }
+		Total_pop = data
         } else {
                 log.Fatal(response.Error(), err)
         }
