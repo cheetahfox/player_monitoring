@@ -355,6 +355,9 @@ func main() {
 	// Get the player/level distribution of seeking players.
 	seeking_distribution = SeekingDistribution(db_players)
 
+	// Populate the number of people seeing in the Stats map
+	Stats["Seeking_Population"] = len(db_players)
+
 	/* 
 	Write both of the Player and Seeking Distributions into the influxdb database
 	*/
@@ -388,10 +391,10 @@ func main() {
 	fmt.Printf("Total crying %s Average time to cry is %s\n", group_crying, average_crying)
 
 	// Get the total People online
-        Total_online := Stats["Current_Population"]
+        Total_online := float64(Stats["Current_Population"])
 
-	PoverS := Total_online / float64(len(db_players))
-	fmt.Printf("Total seeking : %d Ratio of pop/seeking: %1f\n", len(db_players), PoverS )
+	PoverS := Total_online / float64(Stats["Seeking_Population"])
+	fmt.Printf("Total seeking : %d Ratio of pop/seeking: %1f\n", Stats["Seeking_Population"], PoverS )
 
 	// Add PoverS to the Batch point
 	WriteInflux1Tfl(conn, "Stats", "Ratio_PS", "Ratio", PoverS)
@@ -399,6 +402,9 @@ func main() {
 	// Average Seeking Time 
 	WriteInflux1Tfl(conn, "Stats", "Seeking_Time", "Average", average_crying.Seconds())
 
+	// Write seeking population
+	WriteInflux2Tint(conn, "nasomi", "location", "Nasomi", "stat", "seeking_total", Stats["Seeking_Population"])
 
-
+	// Write population
+	WriteInflux2Tint(conn, "nasomi", "location", "Nasomi", "stat", "seeking_total", Stats["Current_Population"])
 }
