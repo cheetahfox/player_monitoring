@@ -403,7 +403,7 @@ func main() {
 	WriteInflux1Tfl(conn, "Stats", "Seeking_Time", "Average", average_crying.Seconds())
 
 	// Write seeking population
-	WriteInflux2Tint(conn, "nasomi", "location", "Nasomi", "stat", "seeking_total", Stats["Seeking_Population"])
+	WriteInflux2Tint(conn, "nasomi", "location", "Nasomi", "stat", "population", Stats["Seeking_Population"])
 
 	// Write population
 	WriteInflux2Tint(conn, "nasomi", "location", "Nasomi", "stat", "seeking_total", Stats["Current_Population"])
