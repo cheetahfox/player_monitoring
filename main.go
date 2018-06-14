@@ -86,10 +86,16 @@ func FetchPlayers(url string) []*Player {
 		players = append(players, newplayer)
 	}
 
+	// Split the jobtxt into actual jobs
+	for i := range(players) {
+		//fmt.Printf("%s is seeking ---> Job is %s\n", players[i].Name, players[i].Jobtxt)
+		players[i] = Genjobs(players[i])
+	}
+
 	return players
 }
 
-func FetchDistribution(Stats map[string]int) []*P_Dist {
+func  GenerateDistribution(Stats map[string]int) []*P_Dist {
 	/*
 	This function returns a slice of Player Distributions
 	It's a Wraper function that allows the rest of the program to work given that I should have been using 
@@ -311,7 +317,7 @@ func main() {
 	db_players := []*Player{}
 	player_distribution := []*P_Dist{}
 	seeking_distribution := []*P_Dist{}
-	fmt.Printf("Playermon startup version %ld\n", Version)
+	fmt.Printf("Playermon startup version %f\n", Version)
 
 	/* Check that we have something in the command line
 	This should be the url to scrape
@@ -321,11 +327,6 @@ func main() {
 	}
 	players = FetchPlayers(os.Getenv("PARTY_PAGE"))
 
-	for i := range(players) {
-		//fmt.Printf("%s is seeking ---> Job is %s\n", players[i].Name, players[i].Jobtxt)
-		players[i] = Genjobs(players[i])
-	}
-
 	if os.Getenv("STATUS_PAGE") == "" {
 		log.Fatal("No Url for status page")
 	}
@@ -333,9 +334,9 @@ func main() {
 	Stats := make(map[string]int)
 	Stats = FetchStats(os.Getenv("STATUS_PAGE"))
 
-	fmt.Println(Stats["Current_Population"])
+	//fmt.Println(Stats["Current_Population"])
 
-	player_distribution = FetchDistribution(Stats)
+	player_distribution = GenerateDistribution(Stats)
 
 	// Connect to the MySql database
 	db := ConnectMySql()
@@ -387,7 +388,7 @@ func main() {
 	fmt.Printf("Total crying %s Average time to cry is %s\n", group_crying, average_crying)
 
 	// Get the total People online
-        Total_online := GetNasomiPop(conn)
+        Total_online := Stats["Current_Population"]
 
 	PoverS := Total_online / float64(len(db_players))
 	fmt.Printf("Total seeking : %d Ratio of pop/seeking: %1f\n", len(db_players), PoverS )
