@@ -13,7 +13,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-const Version = 0.04
+const Version = "0.05"
 
 // This is the main user data structure
 type Player struct {
@@ -163,7 +163,7 @@ func FetchStats(url string) map[string]int {
 			// Player Deaths
 			case 15:
 				if player_death, err := strconv.Atoi(re.ReplaceAllString(s.Text(), "")); err == nil {
-					Stats["Mob_Deaths"] = player_death
+					Stats["Player_Deaths"] = player_death
 				}
 			// Levels < 12
 			case 27:
@@ -319,7 +319,7 @@ func main() {
 	db_players := []*Player{}
 	player_distribution := []*P_Dist{}
 	seeking_distribution := []*P_Dist{}
-	fmt.Printf("Playermon startup version %f\n", Version)
+	fmt.Printf("Playermon startup version %s\n", Version)
 
 	/* Check that we have something in the command line
 	This should be the url to scrape
@@ -409,4 +409,17 @@ func main() {
 
 	// Write population
 	WriteInflux2Tint(conn, "nasomi", "location", "Nasomi", "stat", "population", Stats["Current_Population"])
+
+	// Write AH Transactions
+	WriteInflux1Tfl(conn, "Stats", "Economy", "AH_Transactions", float64(Stats["AH_Transactions"]))
+
+	// Write AH Gil in the last 24 hours 
+	WriteInflux1Tfl(conn, "Stats", "Economy", "AH_gil", float64(Stats["AH_gil"]))
+
+	// Write Mob Deaths in the last 24 hours 
+	WriteInflux1Tfl(conn, "Stats", "Deaths", "mob", float64(Stats["Mob_Deaths"]))
+
+	// Write AH Gil in the last 24 hours 
+	WriteInflux1Tfl(conn, "Stats", "Deaths", "players", float64(Stats["Player_Deaths"]))
+
 }
