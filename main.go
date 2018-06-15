@@ -109,8 +109,8 @@ func  GenerateDistribution(Stats map[string]int) []*P_Dist {
 
 	for i:= range(Level_Ranges) {
 		newdist := new(P_Dist)
-		newdist.Player_Level = i
-		Player_Level :=  strconv.Itoa(i)
+		newdist.Player_Level = Level_Ranges[i]
+		Player_Level :=  strconv.Itoa(Level_Ranges[i])
 		pop := strconv.Itoa(Stats["Dist_level_" + Player_Level])
 		newdist.pop = pop
 		Distribution = append(Distribution, newdist)
@@ -274,6 +274,7 @@ func SeekingDistribution(db_players []*Player) []*P_Dist {
 	/*
 	Now we generate the info for the level ranges.
 	*/
+
 	for i:= range(Level_Ranges) {
 		/* 
 		We are going to do a few different things based on which range we are looking.
@@ -309,6 +310,7 @@ func SeekingDistribution(db_players []*Player) []*P_Dist {
 				Distribution = append(Distribution, newdist)
 		}
 	}
+
 	return Distribution
 }
 

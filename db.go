@@ -87,7 +87,6 @@ func GetMysqlPlayers(db *sql.DB) []*Player {
 		returned_player.Subjob          = Sub
 		returned_player.Mainlevel       = Mainjob_L
 		returned_player.Sublevel        = Subjob_L
-		//returned_player.Minutes_seeking = Minutes_seeking
 		db_players = append(db_players, returned_player)
 	}
 
