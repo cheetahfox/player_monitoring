@@ -1,2 +1,2 @@
 # player_montiroing
-Just a simple Go Program to scrape a website, it's 99% a chance to learn about golang likely this code is terrible.
+Just a simple Go Program to scrape a website. This project  is really just a chance to learn about golang. This code is terrible and full of mistakes, but I am learning.
