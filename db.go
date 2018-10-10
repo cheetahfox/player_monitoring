@@ -50,6 +50,40 @@ func ConnectMySql() *sql.DB {
 	return db
 }
 
+func GetMysqlTods(db *sql.DB) []*Tod {
+	// Get the Current ToD's out of the database
+	var (
+		NM string
+		Killer string
+		Ls string
+		First_Seen time.Time
+		Last_Seen time.Time
+	)
+	tods := []*Tod{}
+
+        rows, err := db.Query("SELECT * FROM nasomi.tod")
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer rows.Close()
+
+	for rows.Next() {
+		err := rows.Scan(&NM, &Killer, &Ls, &First_Seen, &Last_Seen)
+		if err != nil {
+			log.Fatal(err)
+		}
+		db_tod           := new(Tod)
+		db_tod.NM         = NM
+		db_tod.Killer     = Killer
+		db_tod.LinkShell  = Ls
+		db_tod.First_Seen = First_Seen
+		db_tod.Last_Seen  = Last_Seen
+		tods = append(tods, db_tod)
+	}
+
+	return tods
+}
+
 func GetMysqlPlayers(db *sql.DB) []*Player {
 	var (
 		Name string
@@ -111,6 +145,21 @@ func UpdateMysqlSeen(players []*Player, db *sql.DB) {
 	}
 }
 
+func UpdateMysqlTod(tods []*Tod, db *sql.DB) {
+	// This function updates last seen on Tod's in the DB
+	commit, err := db.Prepare("UPDATE nasomi.tod set last_seen=? where nm=?")
+	if err != nil {
+		log.Fatal(err)
+	}
+	for i:= range(tods) {
+		res, err := commit.Exec(tods[i].Last_Seen, tods[i].NM)
+		if err != nil {
+			log.Println(res.RowsAffected())
+			log.Fatal(err)
+		}
+	}
+}
+
 func AddMysqlPlayer(players []*Player, db *sql.DB) {
 	/*
 	This function adds a new user to the 
@@ -121,10 +170,26 @@ func AddMysqlPlayer(players []*Player, db *sql.DB) {
 	}
 	for i:= range(players) {
 		// Since this is the first time, Started seeking is going to be the same as lastseen
-		res, err := addplayer.Exec(players[i].Name, players[i].Lastseen, players[i].Lastseen, players[i].Jobtxt, players[i].Mainlevel, players[i].Sublevel, players[i].Mainjob, players[i].Subjob)
+		_, err := addplayer.Exec(players[i].Name, players[i].Lastseen, players[i].Lastseen, players[i].Jobtxt, players[i].Mainlevel, players[i].Sublevel, players[i].Mainjob, players[i].Subjob)
 		if err != nil {
 			log.Fatal(err)
-			fmt.Println(res.RowsAffected())
+		}
+	}
+}
+
+func AddMysqlTod(tods []*Tod, db *sql.DB) {
+	/*
+	This function adds new Tods to the Db
+	*/
+
+	addtod, err := db.Prepare("INSERT INTO nasomi.tod set nm=?, killer=?, ls=?, first_seen=?, last_seen=?")
+	if err != nil {
+		log.Fatal(err)
+	}
+	for i:= range(tods) {
+		_, err := addtod.Exec(tods[i].NM, tods[i].Killer, tods[i].LinkShell, tods[i].Last_Seen, tods[i].Last_Seen)
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
 }
@@ -158,6 +223,36 @@ func DeleteMysqlPlayer(players []*Player, db *sql.DB) {
 		if err != nil {
 			fmt.Println(res.RowsAffected())
 			log.Fatal("Failed while adding a player")
+		}
+	}
+}
+
+func LogTods(tod *Tod, db *sql.DB) {
+	/*
+	Log each Tod into a full log for later Data processing
+	*/
+	logtod, err := db.Prepare("INSERT INTO nasomi.log_tod set nm=?, killer=?, ls=?, first_seen=?, last_seen=?")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = logtod.Exec(tod.NM, tod.Killer, tod.LinkShell, tod.First_Seen, tod.Last_Seen)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func DeleteMysqlTod(tods []*Tod, db *sql.DB) {
+	// Delete Tod's from the DB if they are no longer on the page
+	deletetod, err := db.Prepare("DELETE FROM nasomi.tod where nm=? AND killer=?")
+	if err != nil {
+		log.Fatal(err)
+	}
+	for i:= range(tods) {
+		LogTods(tods[i], db)
+		_, err := deletetod.Exec(tods[i].NM, tods[i].Killer)
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
 }
@@ -234,6 +329,55 @@ func GetDb(db *sql.DB, players []*Player) []*Player {
 	return db_players
 }
 
+func GetTodDb(db *sql.DB, scraped_tod []*Tod) []*Tod {
+	// similar to GetDb but for the Tod's
+	// Get the current Tods
+	db_tods := GetMysqlTods(db)
+
+	// Update lastseen if the ToD is already in the DB
+	NMtoUpdate := []*Tod{}
+	for i:= range(scraped_tod) {
+		if TodinDB(scraped_tod[i],db_tods) == true {
+			NMtoUpdate = append(NMtoUpdate, scraped_tod[i])
+		}
+	}
+	if NMtoUpdate != nil {
+		UpdateMysqlTod(NMtoUpdate, db)
+	}
+
+	/*
+	Delete Any Tod that doesn't isn't on the Website
+	This has to happen before we insert a new Tod
+	*/
+	NMtoDelete := []*Tod{}
+	for i:= range(db_tods) {
+		if TodinDB(db_tods[i], scraped_tod) != true {
+			NMtoDelete = append(NMtoDelete, db_tods[i])
+		}
+	}
+	if NMtoDelete != nil {
+		// This fuction Logs and Deletes the Tod from the DB
+		DeleteMysqlTod(NMtoDelete, db)
+	}
+
+	/*
+	Check if it's a new Tod, If so add them to the DB
+	*/
+	TodtoAdd := []*Tod{}
+	for i:= range(scraped_tod) {
+		if TodinDB(scraped_tod[i], db_tods) != true {
+			TodtoAdd = append(TodtoAdd, scraped_tod[i])
+		}
+	}
+	if TodtoAdd != nil {
+		AddMysqlTod(TodtoAdd, db)
+	}
+
+	// Refresh the DB Tod's and return them
+	db_tods = GetMysqlTods(db)
+	return db_tods
+}
+
 func WriteInflux1Tfl(conn client.Client, measure string, tag1 string, tag2 string, value float64) {
 	/*
 	This function takes a single float64 value and writes it into the InfluxDb with two tags.
@@ -308,3 +452,33 @@ func WriteInflux2Tint(conn client.Client, measure string, tag string, tag_value 
                 log.Fatal(err)
         }
 }
+
+
+func PlayerinDB( player *Player, db []*Player) (bool) {
+        /*
+        This function checks to see if the player is in a different
+        */
+        for index := range(db) {
+                if player.Name == db[index].Name {
+                        if player.Mainjob == db[index].Mainjob {
+                                return true
+                        }
+                }
+        }
+        return false
+}
+
+func TodinDB( tod *Tod, db []*Tod) (bool) {
+	/*
+	This function checks to see if a ToD is in the different slice of Tod's
+	*/
+	for index := range(db) {
+		if tod.NM == db[index].NM {
+			if tod.Killer == db[index].Killer {
+				return true
+			}
+		}
+	}
+	return false
+}
+

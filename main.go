@@ -13,7 +13,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-const Version = "0.05"
+const Version = "0.06"
 
 // This is the main user data structure
 type Player struct {
@@ -30,6 +30,84 @@ type Player struct {
 type P_Dist struct {
 	Player_Level int
 	pop string
+}
+
+type Tod struct {
+	NM string
+	Killer string
+	LinkShell string
+	Last_Seen time.Time
+	First_Seen time.Time
+}
+
+func FetchTods(url string) []*Tod {
+	/*
+	Grab the ToDs
+	*/
+	res, err := http.Get(url)
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer res.Body.Close()
+        if res.StatusCode != 200 {
+                log.Fatal("Request Status code %d %s", res.StatusCode, res.Status)
+        }
+
+        // Load the HTML to parse
+        doc, err := goquery.NewDocumentFromReader(res.Body)
+        if err != nil {
+                log.Fatal(err)
+        }
+
+	tods := []*Tod{}
+	nms        := make([]string,0)
+	killers    := make([]string,0)
+	linkshells := make([]string,0)
+
+        doc.Find("td").Each(func(i int, s *goquery.Selection) {
+		if i == 0 {
+			return;
+		}
+                if i == 1 {
+                        return;
+                }
+                if i == 2 {
+                        return;
+                }
+		if i == 3 {
+			return;
+		}
+		if i == 4 {
+			return;
+		}
+		if i == 5 {
+			return;
+		}
+		if i == 6 {
+			return;
+		}
+		if (i-3)%3 == 0 {
+			linkshells = append(linkshells, s.Text())
+		}
+                if (i-4)%3 == 0 {
+			nms = append(nms, s.Text())
+                }
+                if (i-5)%3 == 0 {
+			killers = append(killers, s.Text())
+                }
+                })
+
+	now := time.Now()
+	for x := 0; x < len(nms); x++ {
+		newtod           := new(Tod)
+		newtod.NM         = nms[x]
+		newtod.Killer     = killers[x]
+		newtod.LinkShell  = linkshells[x]
+		newtod.Last_Seen  = now
+		tods = append(tods, newtod)
+	}
+
+	return tods
 }
 
 func FetchPlayers(url string) []*Player {
@@ -243,20 +321,6 @@ func Genjobs(user *Player) *Player {
 	return user
 }
 
-func PlayerinDB( player *Player, db []*Player) (bool) {
-	/* 
-	This function checks to see if the player is in a different 
-	*/
-	for index := range(db) {
-		if player.Name == db[index].Name {
-			if player.Mainjob == db[index].Mainjob {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func PlayersBetween(low_l int, high_l int, db_players []*Player) int {
 	// Find the number of players between a range of levels
 	x := 0
@@ -336,6 +400,17 @@ func main() {
 	Stats := make(map[string]int)
 	Stats = FetchStats(os.Getenv("STATUS_PAGE"))
 
+	Tods := FetchTods(os.Getenv("TOD_PAGE"))
+
+	// Remove this
+	var x int
+	x = len(players)
+	x = len(db_players)
+	x = len(player_distribution)
+	x = len(seeking_distribution)
+	x = len(Stats)
+	x = len(Tods)
+
 	//fmt.Println(Stats["Current_Population"])
 
 	player_distribution = GenerateDistribution(Stats)
@@ -348,10 +423,18 @@ func main() {
 	conn := ConnectInfluxdb()
 	defer conn.Close()
 
+	/*
+	Get the Tods
+	*/
+	db_Tods := GetTodDb(db, Tods)
+	x = len(db_Tods)
+	fmt.Println(x)
+
 	/* 
 	Get the players in the MySql Database, we pass along what we see from the fetch to 
 	update the database. By the time we get it here it is the most complete source of information
 	*/
+
 	db_players = GetDb(db, players)
 
 	// Get the player/level distribution of seeking players.
@@ -421,5 +504,4 @@ func main() {
 
 	// Write AH Gil in the last 24 hours 
 	WriteInflux1Tfl(conn, "Stats", "Deaths", "players", float64(Stats["Player_Deaths"]))
-
 }
