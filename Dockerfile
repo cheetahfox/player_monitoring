@@ -8,6 +8,7 @@ RUN go get github.com/go-sql-driver/mysql
 RUN go get github.com/influxdata/influxdb/client/v2
 WORKDIR /go/src/github.com/cheetahfox/player_monitoring
 RUN go build
+RUN strip player_monitoring
 
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates
