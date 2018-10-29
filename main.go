@@ -378,6 +378,26 @@ func SeekingDistribution(db_players []*Player) []*P_Dist {
 	return Distribution
 }
 
+func SeekingJobs(db_players []*Player ) map[string]int {
+	/* 
+	Generage the nubmers of each job seeking
+	I could do this in a DB query but I already have up to date informaton here in db_players
+	*/
+	SeekingJobs := make(map[string]int)
+	Jobs := []string{"BRD","BLM","BLU","BST","COR","DRG","DRK","MNK","NIN","PLD","PUP","RDM","RNG","SAM","THF","WAR","WHM"}
+
+	for i:= range(Jobs) {
+		count := 0
+		for x:= range(db_players) {
+			if db_players[x].Mainjob == Jobs[i] {
+				count++
+			}
+		}
+	SeekingJobs[Jobs[i]] = count
+	}
+	return SeekingJobs
+}
+
 func main() {
 	players    := []*Player{}
 	db_players := []*Player{}
@@ -430,6 +450,14 @@ func main() {
 
 	// Get the player/level distribution of seeking players.
 	seeking_distribution = SeekingDistribution(db_players)
+
+	// Get the jobs distribution of the seeking players.
+	seeking_jobs := make(map[string]int)
+	seeking_jobs = SeekingJobs(db_players)
+
+	for SeekJob, JobNumber := range seeking_jobs {
+		fmt.Printf(" %s, %s \n", SeekJob, JobNumber)
+	}
 
 	// Populate the number of people seeing in the Stats map
 	Stats["Seeking_Population"] = len(db_players)
