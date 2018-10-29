@@ -13,7 +13,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-const Version = "0.06"
+const Version = "0.07"
 
 // This is the main user data structure
 type Player struct {
@@ -397,22 +397,14 @@ func main() {
 		log.Fatal("No Url for status page")
 	}
 
+	// Get stats
 	Stats := make(map[string]int)
 	Stats = FetchStats(os.Getenv("STATUS_PAGE"))
 
+	// Get ToD's
 	Tods := FetchTods(os.Getenv("TOD_PAGE"))
 
-	// Remove this
-	var x int
-	x = len(players)
-	x = len(db_players)
-	x = len(player_distribution)
-	x = len(seeking_distribution)
-	x = len(Stats)
-	x = len(Tods)
-
-	//fmt.Println(Stats["Current_Population"])
-
+	// Generate player distribution
 	player_distribution = GenerateDistribution(Stats)
 
 	// Connect to the MySql database
@@ -424,11 +416,10 @@ func main() {
 	defer conn.Close()
 
 	/*
-	Get the Tods
+	Refresh the Tods Database
+	After I update it, I don't do anything else with it in this program. It's displayed in Grafana
 	*/
-	db_Tods := GetTodDb(db, Tods)
-	x = len(db_Tods)
-	fmt.Println(x)
+	GenTodDb(db, Tods)
 
 	/* 
 	Get the players in the MySql Database, we pass along what we see from the fetch to 

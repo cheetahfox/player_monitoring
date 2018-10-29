@@ -329,7 +329,7 @@ func GetDb(db *sql.DB, players []*Player) []*Player {
 	return db_players
 }
 
-func GetTodDb(db *sql.DB, scraped_tod []*Tod) []*Tod {
+func GenTodDb(db *sql.DB, scraped_tod []*Tod) {
 	// similar to GetDb but for the Tod's
 	// Get the current Tods
 	db_tods := GetMysqlTods(db)
@@ -372,10 +372,6 @@ func GetTodDb(db *sql.DB, scraped_tod []*Tod) []*Tod {
 	if TodtoAdd != nil {
 		AddMysqlTod(TodtoAdd, db)
 	}
-
-	// Refresh the DB Tod's and return them
-	db_tods = GetMysqlTods(db)
-	return db_tods
 }
 
 func WriteInflux1Tfl(conn client.Client, measure string, tag1 string, tag2 string, value float64) {
