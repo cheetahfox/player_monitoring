@@ -455,8 +455,9 @@ func main() {
 	seeking_jobs := make(map[string]int)
 	seeking_jobs = SeekingJobs(db_players)
 
+	// Write this into the db where the old bash script used to... 
 	for SeekJob, JobNumber := range seeking_jobs {
-		fmt.Printf(" %s, %s \n", SeekJob, JobNumber)
+		WriteInflux1Tfl(conn, "nasomi", "seeking_job", SeekJob, float64(JobNumber))
 	}
 
 	// Populate the number of people seeing in the Stats map
