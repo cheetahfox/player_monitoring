@@ -13,7 +13,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-const Version = "0.08"
+const Version = "0.10"
 
 // This is the main user data structure
 type Player struct {
@@ -111,6 +111,9 @@ func FetchTods(url string) []*Tod {
 }
 
 func FetchPlayers(url string) []*Player {
+	players := []*Player{}
+	names := make([]string,0)
+	jobs  := make([]string,0)
 	/* This funciton is rather specific to the page I am scraping. We take the url 
 	and return two slices with players names and jobs that currently seeking 
 	party. 
@@ -121,19 +124,15 @@ func FetchPlayers(url string) []*Player {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		log.Fatal("Request Status code %d %s", res.StatusCode, res.Status)
+		log.Print("Request Status code %d %s", res.StatusCode, res.Status)
 	}
 
 	// Load the HTML to parse
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
+		return players
 	}
-
-	players := []*Player{}
-	names := make([]string,0)
-	jobs  := make([]string,0)
-
 
 	doc.Find("td").Each(func(i int, s *goquery.Selection) {
 		// We skip the first two TD's because they don't contain normal data
@@ -167,7 +166,7 @@ func FetchPlayers(url string) []*Player {
 	// Split the jobtxt into actual jobs
 	for i := range(players) {
 		//fmt.Printf("%s is seeking ---> Job is %s\n", players[i].Name, players[i].Jobtxt)
-		players[i] = Genjobs(players[i])
+		Genjobs(players[i])
 	}
 
 	return players
@@ -209,13 +208,13 @@ func FetchStats(url string) map[string]int {
         }
         defer res.Body.Close()
         if res.StatusCode != 200 {
-                log.Fatal("Request Status code %d %s", res.StatusCode, res.Status)
+                log.Print("Request Status code %d %s", res.StatusCode, res.Status)
         }
 
 	// Load the HTML to parse
         doc, err := goquery.NewDocumentFromReader(res.Body)
         if err != nil {
-                log.Fatal(err)
+                log.Print(err)
         }
 
 	// Regex to match non-nummeric chars
@@ -298,7 +297,7 @@ func FetchStats(url string) map[string]int {
 	return Stats
 }
 
-func Genjobs(user *Player) *Player {
+func Genjobs(user *Player) {
 	// Split the jobtxt
 	jobs := strings.Split(user.Jobtxt, "/")
 
@@ -306,19 +305,24 @@ func Genjobs(user *Player) *Player {
 	Since our data always has a / in it, we know we will have a slice with two strings
 	Index[0] is always going to be the mainjob level and [1] will always be the subjob
 	also setup the regex to match only numbers
-	*/
-	re := regexp.MustCompile("[0-9]+")
-	if mlevel, err := strconv.Atoi(re.FindString(jobs[0])); err == nil {
-		user.Mainlevel = mlevel
-	}
-	if slevel, err := strconv.Atoi(re.FindString(jobs[1])); err == nil {
-		user.Sublevel = slevel
-	}
 
-	re = regexp.MustCompile("[a-zA-Z]+")
-	user.Mainjob = re.FindString(jobs[0])
-	user.Subjob =  re.FindString(jobs[1])
-	return user
+	Ok time to add more error checking since if we get a blank Jobtxt we panic the golang runtime
+	because we are out of index... none of this code should run unless we split the string... 
+	*/
+	if len(jobs) == 2 {
+
+		re := regexp.MustCompile("[0-9]+")
+		if mlevel, err := strconv.Atoi(re.FindString(jobs[0])); err == nil {
+			user.Mainlevel = mlevel
+		}
+		if slevel, err := strconv.Atoi(re.FindString(jobs[1])); err == nil {
+			user.Sublevel = slevel
+		}
+
+		re = regexp.MustCompile("[a-zA-Z]+")
+		user.Mainjob = re.FindString(jobs[0])
+		user.Subjob =  re.FindString(jobs[1])
+	}
 }
 
 func PlayersBetween(low_l int, high_l int, db_players []*Player) int {
@@ -491,10 +495,15 @@ func main() {
 		crying_since := db_players[i].Lastseen.Sub(db_players[i].Started_seeking)
 		group_crying = group_crying + crying_since
 	}
-	average_crying := group_crying/time.Duration(len(db_players))
 
-	// If you want to divide a Duration by some variable, you do it like this.
-	fmt.Printf("Total crying %s Average time to cry is %s\n", group_crying, average_crying)
+	if len(db_players) != 0 {  // If the Party finder page isn't responding, we shouldn't be assuming the db_players going to have anyone in it.
+		average_crying := group_crying/time.Duration(len(db_players))
+		// If you want to divide a Duration by some variable, you do it like this.
+		fmt.Printf("Total crying %s Average time to cry is %s\n", group_crying, average_crying)
+
+		// Average Seeking Time 
+		WriteInflux1Tfl(conn, "Stats", "Seeking_Time", "Average", average_crying.Seconds())
+	}
 
 	// Get the total People online
         Total_online := float64(Stats["Current_Population"])
@@ -504,9 +513,6 @@ func main() {
 
 	// Add PoverS to the Batch point
 	WriteInflux1Tfl(conn, "Stats", "Ratio_PS", "Ratio", PoverS)
-
-	// Average Seeking Time 
-	WriteInflux1Tfl(conn, "Stats", "Seeking_Time", "Average", average_crying.Seconds())
 
 	// Write seeking population
 	WriteInflux2Tint(conn, "nasomi", "location", "Nasomi", "stat", "seeking_total", Stats["Seeking_Population"])
