@@ -13,7 +13,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-const Version = "0.10"
+const Version = "0.11"
 
 // This is the main user data structure
 type Player struct {
@@ -118,9 +118,11 @@ func FetchPlayers(url string) []*Player {
 	and return two slices with players names and jobs that currently seeking 
 	party. 
 	*/
+
 	res, err := http.Get(url)
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
+		return players
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
