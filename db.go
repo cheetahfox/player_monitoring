@@ -1,14 +1,14 @@
 package main
 
 import (
-        "fmt"
-        "log"
+	"fmt"
+	"log"
 	"time"
 	"os"
-        "database/sql"
+    "database/sql"
 	"encoding/json"
-        _ "github.com/go-sql-driver/mysql"
-	"github.com/influxdata/influxdb/client/v2"
+    _ "github.com/go-sql-driver/mysql"
+	"github.com/influxdata/influxdb1-client/v2"
 )
 
 

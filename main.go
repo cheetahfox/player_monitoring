@@ -11,6 +11,7 @@ import (
 	"time"
 	//"reflect"
 	"github.com/PuerkitoBio/goquery"
+	"gopkg.in/headzoo/surf.v1"
 )
 
 const Version = "0.11"
@@ -119,18 +120,20 @@ func FetchPlayers(url string) []*Player {
 	party. 
 	*/
 
-	res, err := http.Get(url)
+	bow := surf.NewBrowser()
+	err := bow.Open(url)
 	if err != nil {
 		log.Print(err)
 		return players
 	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		log.Print("Request Status code %d %s", res.StatusCode, res.Status)
+
+	if bow.StatusCode() != 200 {
+		log.Print("Surf bow Request Status code %d\n", bow.StatusCode())
 	}
 
+	body := bow.Body()
 	// Load the HTML to parse
-	doc, err := goquery.NewDocumentFromReader(res.Body)
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(body))
 	if err != nil {
 		log.Print(err)
 		return players
